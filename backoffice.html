@@ -71,7 +71,7 @@
   </div>
   <div class="head-actions">
     <input id="token" class="token-input" type="password" placeholder="Token admin optionnel">
-    <button id="exportExcel" class="btn" type="button">Exporter Excel</button>
+    <button id="exportExcel" class="btn" type="button">Exporter XLSX</button>
     <button id="refresh" class="btn" type="button">Actualiser</button>
     <a class="btn" href="index.html">Retour au générateur</a>
   </div>
@@ -211,10 +211,10 @@ function exportExcel(){
     const blob = xhr.response;
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'acc-visuels-export.csv';
+    link.download = 'acc-visuels-export.xlsx';
     link.click();
     URL.revokeObjectURL(link.href);
-    setStatus('Export Excel-compatible téléchargé.', 'ok');
+    setStatus('Export Excel .xlsx téléchargé.', 'ok');
   };
   xhr.onerror = () => setStatus('Export Excel indisponible pour le moment.', 'warn');
   xhr.send();

@@ -1,16 +1,11 @@
+const XLSX = require('xlsx');
 const { readEvents } = require('./_lib/store');
 
-function sendText(res, statusCode, body, filename){
+function sendBinary(res, statusCode, body, filename){
   res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
   res.end(body);
-}
-
-function escapeCsv(value){
-  const text = String(value || '').replace(/\r?\n/g, ' ');
-  if(/[",;]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
-  return text;
 }
 
 module.exports = async (req, res) => {
@@ -27,38 +22,29 @@ module.exports = async (req, res) => {
   }
 
   const events = await readEvents();
-  const headers = [
-    'Date',
-    'Nom militant',
-    'Telephone',
-    'Coordination',
-    'Nom sur visuel',
-    'Hashtag',
-    'Etiquette slogan',
-    'Sous-titre',
-    'Titre principal',
-    'Localisation reseau',
-    'Coordonnees GPS',
-    'Fuseau horaire',
-    'Langue'
+  const rows = events.map(event => ({
+    Date: event.createdAt || '',
+    'Nom militant': event.contactName || '',
+    Telephone: event.phone || '',
+    Coordination: event.coordination || '',
+    'Nom sur visuel': event.candidateName || '',
+    Hashtag: event.hashtag || '',
+    'Etiquette slogan': event.sloganTag || '',
+    'Sous-titre': event.sloganSub || '',
+    'Titre principal': event.headline || '',
+    'Localisation reseau': (event.networkLocation && event.networkLocation.label) || '',
+    'Coordonnees GPS': event.geo ? event.geo.lat + ', ' + event.geo.lng : '',
+    'Fuseau horaire': event.timezone || '',
+    Langue: event.language || ''
+  }));
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  worksheet['!cols'] = [
+    { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 22 },
+    { wch: 34 }, { wch: 28 }, { wch: 30 }, { wch: 22 }, { wch: 24 }, { wch: 14 }
   ];
-
-  const rows = events.map(event => [
-    event.createdAt || '',
-    event.contactName || '',
-    event.phone || '',
-    event.coordination || '',
-    event.candidateName || '',
-    event.hashtag || '',
-    event.sloganTag || '',
-    event.sloganSub || '',
-    event.headline || '',
-    (event.networkLocation && event.networkLocation.label) || '',
-    event.geo ? event.geo.lat + ', ' + event.geo.lng : '',
-    event.timezone || '',
-    event.language || ''
-  ]);
-
-  const csv = '\uFEFF' + [headers, ...rows].map(row => row.map(escapeCsv).join(';')).join('\n');
-  return sendText(res, 200, csv, 'acc-visuels-export.csv');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Visuels');
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  return sendBinary(res, 200, buffer, 'acc-visuels-export.xlsx');
 };

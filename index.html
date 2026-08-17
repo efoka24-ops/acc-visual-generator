@@ -25,6 +25,7 @@
   header span{color:var(--orange);font-family:'Barlow Condensed';letter-spacing:2px;font-size:13px;text-transform:uppercase}
   .navlink{display:inline-flex;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:999px;color:var(--txt);text-decoration:none;font-size:12px;letter-spacing:1px;text-transform:uppercase}
   .navlink:hover{border-color:var(--orange);color:#fff}
+  .navbtn{background:transparent;cursor:pointer}
   .wrap{display:grid;grid-template-columns:400px 1fr;gap:0;min-height:calc(100vh - 61px)}
   .form{padding:22px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 61px)}
   .stage{padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px;background:#0e0b07}
@@ -54,15 +55,43 @@
   fieldset{border:0;padding:0;margin:0}
   .sep{height:1px;background:var(--line);margin:24px 0 4px}
   .sep-t{font-family:'Barlow Condensed';font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--orange);margin-top:22px}
+  .gate{position:fixed;inset:0;background:rgba(8,5,2,.88);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:40}
+  .gate[hidden]{display:none}
+  .gate-card{width:min(100%,560px);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:26px;box-shadow:0 30px 90px rgba(0,0,0,.45)}
+  .gate-title{font-family:'Anton',Impact,sans-serif;font-size:38px;line-height:1;letter-spacing:1px;text-transform:uppercase;margin:0 0 8px}
+  .gate-sub{font-family:'Barlow Condensed';font-size:14px;letter-spacing:2px;color:var(--orange);text-transform:uppercase;margin-bottom:10px}
+  .gate-copy{font-size:14px;line-height:1.6;color:var(--txt);opacity:.92;margin:0 0 18px}
+  .gate-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .gate-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
   @media(max-width:900px){.wrap{grid-template-columns:1fr}.form{border-right:0;border-bottom:1px solid var(--line);max-height:none}}
 </style>
 </head>
 <body>
 
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="gate-sub">Identification obligatoire</div>
+    <h2 class="gate-title">Accès au générateur</h2>
+    <p class="gate-copy">Avant d'ouvrir le générateur, le militant doit renseigner son nom complet, son numéro de téléphone et sa coordination. Ces données alimentent le back office et l'export Excel.</p>
+    <label>Nom complet du militant</label>
+    <input type="text" id="gateContactName" placeholder="Ex. Ousmane Hamadou">
+    <label>Numéro de téléphone</label>
+    <input type="tel" id="gatePhone" placeholder="Ex. 6 99 99 99 99" inputmode="tel">
+    <label>Coordination</label>
+    <input type="text" id="gateCoordination" placeholder="Ex. ACC · FIGUIL">
+    <div class="gate-actions">
+      <button class="dl" id="gateSubmit" type="button" style="margin-top:0">Ouvrir le générateur</button>
+    </div>
+    <div class="status" id="gateStatus" data-tone="muted" hidden></div>
+    <div class="gate-note">Ces informations restent modifiables dans le formulaire avant le téléchargement final.</div>
+  </div>
+</div>
+
 <header>
   <h1>Générateur de visuel</h1>
   <div class="headsp"></div>
   <span>All Cameroonian Congress</span>
+  <button class="navlink navbtn" id="editIdentity" type="button">Identité</button>
   <a class="navlink" href="backoffice.html">Back Office</a>
 </header>
 
@@ -136,6 +165,14 @@ const FIXED_MOTTO = 'UNITÉ — PROGRÈS — ÉQUITÉ';
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const trackStatus = document.getElementById('trackStatus');
+const gate = document.getElementById('gate');
+const gateStatus = document.getElementById('gateStatus');
+const gateFields = {
+  contactName: document.getElementById('gateContactName'),
+  phone: document.getElementById('gatePhone'),
+  coordination: document.getElementById('gateCoordination')
+};
+const STORAGE_KEY = 'acc_identity_v1';
 
 const state = {
   img: null,
@@ -254,6 +291,13 @@ function setTrackStatus(message, tone){
   trackStatus.textContent = message || '';
 }
 
+function setGateStatus(message, tone){
+  if(!gateStatus) return;
+  gateStatus.hidden = !message;
+  gateStatus.dataset.tone = tone || 'muted';
+  gateStatus.textContent = message || '';
+}
+
 function getTextValue(id){
   const el = document.getElementById(id);
   return el ? el.value.trim() : '';
@@ -261,6 +305,81 @@ function getTextValue(id){
 
 function normalizePhone(value){
   return String(value || '').replace(/[^\d+]/g, '').trim();
+}
+
+function syncIdentityFields(identity){
+  const next = identity || {};
+  document.getElementById('contactName').value = next.contactName || '';
+  document.getElementById('phone').value = next.phone || '';
+  if(next.coordination){
+    document.getElementById('l1').value = next.coordination;
+    state.l1 = next.coordination;
+  }
+  state.contactName = document.getElementById('contactName').value;
+  state.phone = document.getElementById('phone').value;
+  render();
+}
+
+function readIdentity(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || typeof parsed !== 'object') return null;
+    return {
+      contactName: String(parsed.contactName || '').trim(),
+      phone: normalizePhone(parsed.phone || ''),
+      coordination: String(parsed.coordination || '').trim()
+    };
+  }catch(_error){
+    return null;
+  }
+}
+
+function writeIdentity(identity){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(identity));
+  }catch(_error){}
+}
+
+function openGate(prefill){
+  const identity = prefill || readIdentity() || {
+    contactName: getTextValue('contactName'),
+    phone: normalizePhone(getTextValue('phone')),
+    coordination: getTextValue('l1')
+  };
+  gateFields.contactName.value = identity.contactName || '';
+  gateFields.phone.value = identity.phone || '';
+  gateFields.coordination.value = identity.coordination || '';
+  setGateStatus('', 'muted');
+  gate.hidden = false;
+  document.body.style.overflow = 'hidden';
+  gateFields.contactName.focus();
+}
+
+function closeGate(){
+  gate.hidden = true;
+  document.body.style.overflow = '';
+}
+
+function submitGate(){
+  const identity = {
+    contactName: gateFields.contactName.value.trim(),
+    phone: normalizePhone(gateFields.phone.value),
+    coordination: gateFields.coordination.value.trim().toUpperCase()
+  };
+  const missing = [];
+  if(!identity.contactName) missing.push('nom du militant');
+  if(!identity.phone) missing.push('numéro de téléphone');
+  if(!identity.coordination) missing.push('coordination');
+  if(missing.length){
+    setGateStatus('Renseigne ' + missing.join(', ') + ' pour continuer.', 'warn');
+    return;
+  }
+  writeIdentity(identity);
+  syncIdentityFields(identity);
+  setTrackStatus('Identité enregistrée. Le générateur est prêt.', 'ok');
+  closeGate();
 }
 
 function validateRequiredFields(){
@@ -562,6 +681,7 @@ document.getElementById('download').addEventListener('click', ()=>{
   const missing = validateRequiredFields();
   if(missing.length){
     setTrackStatus('Renseigne ' + missing.join(', ') + ' avant de télécharger le visuel.', 'warn');
+    openGate();
     return;
   }
   render();
@@ -572,9 +692,26 @@ document.getElementById('download').addEventListener('click', ()=>{
   a.click();
 });
 document.getElementById('reset').addEventListener('click', ()=> location.reload());
+document.getElementById('gateSubmit').addEventListener('click', submitGate);
+document.getElementById('editIdentity').addEventListener('click', () => openGate());
+
+Object.values(gateFields).forEach(field => {
+  field.addEventListener('keydown', event => {
+    if(event.key === 'Enter') submitGate();
+  });
+});
 
 /* premier rendu après chargement des polices */
-(document.fonts ? document.fonts.ready : Promise.resolve()).then(render);
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
+  render();
+  const savedIdentity = readIdentity();
+  if(savedIdentity && savedIdentity.contactName && savedIdentity.phone && savedIdentity.coordination){
+    syncIdentityFields(savedIdentity);
+    closeGate();
+  } else {
+    openGate(savedIdentity || undefined);
+  }
+});
 render();
 </script>
 </body>
