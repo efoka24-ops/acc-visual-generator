@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACC — Générateur de visuel de campagne</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --orange:#F0A02A;
+    --orange-dk:#D8871A;
+    --ink:#14100a;
+    --panel:#1c1712;
+    --line:#332b21;
+    --txt:#f3ece2;
+    --muted:#a89a86;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--txt);font-family:'Barlow',system-ui,sans-serif}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px}
+  header h1{font-family:'Anton',Impact,sans-serif;font-size:20px;letter-spacing:.5px;margin:0;text-transform:uppercase}
+  header span{color:var(--orange);font-family:'Barlow Condensed';letter-spacing:2px;font-size:13px;text-transform:uppercase}
+  .wrap{display:grid;grid-template-columns:400px 1fr;gap:0;min-height:calc(100vh - 61px)}
+  .form{padding:22px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 61px)}
+  .stage{padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px;background:#0e0b07}
+  label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);margin:16px 0 6px;font-weight:600}
+  input[type=text],textarea,select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);
+    padding:10px 12px;border-radius:6px;font-family:'Barlow';font-size:14px}
+  input[type=text]:focus,textarea:focus{outline:none;border-color:var(--orange)}
+  textarea{resize:vertical;min-height:88px;line-height:1.35}
+  input[type=range]{width:100%;accent-color:var(--orange)}
+  .file{border:1px dashed var(--line);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:var(--panel);font-size:13px;color:var(--muted)}
+  .file:hover{border-color:var(--orange);color:var(--txt)}
+  .file input{display:none}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45}
+  button.dl{width:100%;margin-top:22px;background:var(--orange);color:#1a1207;border:0;padding:14px;border-radius:8px;
+    font-family:'Anton';font-size:16px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+  button.dl:hover{background:#ffb63f}
+  button.ghost{width:100%;margin-top:8px;background:transparent;color:var(--muted);border:1px solid var(--line);
+    padding:10px;border-radius:8px;font-size:12px;cursor:pointer;letter-spacing:1px;text-transform:uppercase}
+  button.ghost:hover{color:var(--txt);border-color:var(--muted)}
+  canvas{max-width:100%;max-height:calc(100vh - 150px);box-shadow:0 20px 60px rgba(0,0,0,.6);border-radius:2px;cursor:move}
+  .stagehint{font-size:12px;color:var(--muted)}
+  fieldset{border:0;padding:0;margin:0}
+  .sep{height:1px;background:var(--line);margin:24px 0 4px}
+  .sep-t{font-family:'Barlow Condensed';font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--orange);margin-top:22px}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}.form{border-right:0;border-bottom:1px solid var(--line);max-height:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Générateur de visuel</h1>
+  <span>All Cameroonian Congress</span>
+</header>
+
+<div class="wrap">
+  <div class="form">
+
+    <div class="sep-t">Photo</div>
+    <label class="file" for="photo" style="margin-top:8px">
+      <input type="file" id="photo" accept="image/*">
+      <span id="photoName">Choisir une photo (portrait)</span>
+    </label>
+    <div class="hint">Le filtre orange officiel est appliqué automatiquement. Glisse la photo sur l'aperçu pour la recadrer.</div>
+
+    <label>Zoom</label>
+    <input type="range" id="zoom" min="0.5" max="3" step="0.01" value="1">
+
+    <div class="sep-t">Coordination</div>
+    <label>Ligne 1 (parti · localité)</label>
+    <input type="text" id="l1" value="ACC · FIGUIL">
+    <label>Devise fixe</label>
+    <input type="text" id="l2" value="UNITÉ — PROGRÈS — ÉQUITÉ" readonly>
+
+    <div class="sep-t">Slogan</div>
+    <label>Étiquette (bandeau blanc)</label>
+    <input type="text" id="tag" value="EN NJEHEN YEESO">
+    <label>Sous-titre</label>
+    <input type="text" id="sub" value="Avançons ensemble — le projet, c'est nous.">
+    <label>Titre principal (une ligne par ligne)</label>
+    <textarea id="head">L'ESPOIR
+CHANGE
+DE CAMP.</textarea>
+    <div class="hint">Le dernier mot est automatiquement mis en orange. Ajoute <code>|</code> avant un mot pour le colorer manuellement.</div>
+    <div class="hint">La composition reste fixe. Le texte s'ajuste automatiquement pour rester dans le gabarit.</div>
+
+    <div class="sep-t">Bandeau bas</div>
+    <div class="row">
+      <div>
+        <label>Nom</label>
+        <input type="text" id="name" value="FAYÇAL HAMADOU">
+      </div>
+      <div>
+        <label>Hashtag</label>
+        <input type="text" id="hash" value="#AvecFayçal">
+      </div>
+    </div>
+
+    <div class="hint">Le logo, le filtre et la mise en page restent inchangés pour tous les visuels.</div>
+
+    <button class="dl" id="download">Télécharger le visuel</button>
+    <button class="ghost" id="reset">Réinitialiser</button>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="2160" height="2700"></canvas>
+    <div class="stagehint">Glisse sur l'image pour repositionner la photo · export PNG 2160×2700</div>
+  </div>
+</div>
+
+<script>
+const W = 2160, H = 2700;
+const ORANGE = '#F0A02A';
+const FIXED_MOTTO = 'UNITÉ — PROGRÈS — ÉQUITÉ';
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const state = {
+  img: null,
+  zoom: 1, ox: 0, oy: 0,          // offsets en pixels canvas
+  l1: '', l2: '', tag: '', sub: '', head: '', name: '', hash: ''
+};
+
+const fixedLogo = new Image();
+fixedLogo.src = 'logo-acc.png';
+fixedLogo.onload = () => render();
+
+/* ---------- filtre duotone officiel : noir chaud -> orange -> crème ---------- */
+const RAMP = buildRamp([
+  [0.00,   8,   5,   2],
+  [0.28,  92,  52,   6],
+  [0.55, 208, 132,  24],
+  [0.80, 244, 186,  92],
+  [1.00, 255, 244, 226]
+]);
+
+function buildRamp(stops){
+  const r = new Uint8ClampedArray(256*3);
+  for(let i=0;i<256;i++){
+    const t = i/255;
+    let a = stops[0], b = stops[stops.length-1];
+    for(let s=0;s<stops.length-1;s++){
+      if(t>=stops[s][0] && t<=stops[s+1][0]){ a=stops[s]; b=stops[s+1]; break; }
+    }
+    const f = b[0]===a[0] ? 0 : (t-a[0])/(b[0]-a[0]);
+    r[i*3]   = a[1]+(b[1]-a[1])*f;
+    r[i*3+1] = a[2]+(b[2]-a[2])*f;
+    r[i*3+2] = a[3]+(b[3]-a[3])*f;
+  }
+  return r;
+}
+
+/* photo -> canvas hors écran duotoné */
+const off = document.createElement('canvas');
+const offc = off.getContext('2d');
+
+function getPhotoPlacement(){
+  if(!state.img) return null;
+  const im = state.img;
+  const base = Math.max(W / im.width, H / im.height);
+  const scale = base * state.zoom;
+  const width = im.width * scale;
+  const height = im.height * scale;
+  const minX = W - width;
+  const minY = H - height;
+  return {
+    width,
+    height,
+    minX,
+    minY,
+    centerX: (W - width) / 2,
+    centerY: (H - height) / 2
+  };
+}
+
+function clampPhotoOffsets(){
+  const placement = getPhotoPlacement();
+  if(!placement) return;
+  const minOffsetX = Math.min(placement.minX - placement.centerX, 0);
+  const maxOffsetX = Math.max(-placement.centerX, 0);
+  const minOffsetY = Math.min(placement.minY - placement.centerY, 0);
+  const maxOffsetY = Math.max(-placement.centerY, 0);
+  state.ox = Math.min(Math.max(state.ox, minOffsetX), maxOffsetX);
+  state.oy = Math.min(Math.max(state.oy, minOffsetY), maxOffsetY);
+}
+
+function drawPhoto(){
+  off.width = W; off.height = H;
+  offc.fillStyle = '#0d0803';
+  offc.fillRect(0,0,W,H);
+
+  if(state.img){
+    clampPhotoOffsets();
+    const im = state.img;
+    const placement = getPhotoPlacement();
+    const dx = placement.centerX + state.ox;
+    const dy = placement.centerY + state.oy;
+    offc.drawImage(im, dx, dy, placement.width, placement.height);
+
+    // duotone
+    const d = offc.getImageData(0,0,W,H);
+    const p = d.data;
+    for(let i=0;i<p.length;i+=4){
+      const l = (p[i]*0.299 + p[i+1]*0.587 + p[i+2]*0.114) | 0;
+      p[i]   = RAMP[l*3];
+      p[i+1] = RAMP[l*3+1];
+      p[i+2] = RAMP[l*3+2];
+    }
+    offc.putImageData(d,0,0);
+  }
+  ctx.drawImage(off,0,0);
+
+  // dégradé sombre bas (lisibilité du titre)
+  const g = ctx.createLinearGradient(0,H*0.42,0,H);
+  g.addColorStop(0,'rgba(10,7,3,0)');
+  g.addColorStop(0.55,'rgba(10,7,3,0.55)');
+  g.addColorStop(1,'rgba(8,5,2,0.94)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,H*0.42,W,H*0.58);
+
+  // léger voile chaud global
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.fillStyle = 'rgba(240,160,42,0.10)';
+  ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function fitFontSize(text, maxWidth, startSize, minSize, fontBuilder){
+  let size = startSize;
+  while(size > minSize){
+    ctx.font = fontBuilder(size);
+    if(ctx.measureText(text).width <= maxWidth) return size;
+    size -= 2;
+  }
+  return minSize;
+}
+
+function measureTrackedText(text, tracking){
+  if(!text) return 0;
+  const clean = String(text);
+  return ctx.measureText(clean).width + (Math.max(clean.length - 1, 0) * tracking);
+}
+
+function drawTrackedText(text, x, y, tracking){
+  const clean = String(text);
+  for(let index = 0; index < clean.length; index++){
+    const char = clean[index];
+    ctx.fillText(char, x, y);
+    x += ctx.measureText(char).width + tracking;
+  }
+}
+
+function fitTrackedFontSize(text, maxWidth, startSize, minSize, tracking, fontBuilder){
+  let size = startSize;
+  while(size > minSize){
+    ctx.font = fontBuilder(size);
+    if(measureTrackedText(text, tracking) <= maxWidth) return size;
+    size -= 2;
+  }
+  return minSize;
+}
+
+function wrapTextLines(text, maxWidth){
+  const rawLines = String(text || '').split('\n');
+  const wrapped = [];
+  rawLines.forEach(line => {
+    const words = line.trim().split(/\s+/).filter(Boolean);
+    if(!words.length){
+      wrapped.push('');
+      return;
+    }
+    let current = words[0];
+    for(let i = 1; i < words.length; i++){
+      const next = current + ' ' + words[i];
+      if(ctx.measureText(next).width <= maxWidth){
+        current = next;
+      } else {
+        wrapped.push(current);
+        current = words[i];
+      }
+    }
+    wrapped.push(current);
+  });
+  return wrapped.filter((line, index, array) => line !== '' || array.length === 1);
+}
+
+function drawFixedLogo(cx, cy, radius){
+  const size = radius * 2;
+  if(!fixedLogo.complete || !fixedLogo.naturalWidth){
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#fffdf8';
+    ctx.fill();
+    return;
+  }
+  ctx.drawImage(fixedLogo, cx - radius, cy - radius, size, size);
+}
+
+function fitHeadline(lines, startSize, minSize, maxWidth){
+  let size = startSize;
+  while(size > minSize){
+    ctx.font = size + 'px "Anton", Impact, sans-serif';
+    const fits = lines.every(raw => {
+      const words = raw.trim().split(/\s+/).map(word => word.startsWith('|') ? word.slice(1) : word);
+      return ctx.measureText(words.join(' ')).width <= maxWidth;
+    });
+    if(fits) return size;
+    size -= 2;
+  }
+  return minSize;
+}
+
+/* ---------- rendu complet ---------- */
+function render(){
+  ctx.clearRect(0,0,W,H);
+  drawPhoto();
+
+  const M = 148;                 // marge gauche
+  const RIGHT_SAFE = 420;
+
+  /* --- en-tête coordination --- */
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#ffffff';
+  const coordTracking1 = 9;
+  const coord1Size = fitTrackedFontSize(state.l1.toUpperCase(), W - M - RIGHT_SAFE, 40, 26, coordTracking1, size => '700 ' + size + 'px "Barlow Condensed", sans-serif');
+  ctx.font = '700 ' + coord1Size + 'px "Barlow Condensed", sans-serif';
+  drawTrackedText(state.l1.toUpperCase(), M, 180, coordTracking1);
+
+  ctx.fillStyle = ORANGE;
+  const coordTracking2 = 7;
+  const coord2Size = fitTrackedFontSize(state.l2.toUpperCase(), W - M - RIGHT_SAFE, 32, 20, coordTracking2, size => '600 ' + size + 'px "Barlow Condensed", sans-serif');
+  ctx.font = '600 ' + coord2Size + 'px "Barlow Condensed", sans-serif';
+  drawTrackedText(state.l2.toUpperCase(), M, 232, coordTracking2);
+
+  /* --- logo haut-droite --- */
+  const lr = 118, lcx = W - M - lr, lcy = 232;
+  drawFixedLogo(lcx, lcy, lr);
+
+  /* --- bandeau bas orange --- */
+  const BAR = 252;
+  ctx.fillStyle = ORANGE;
+  ctx.fillRect(0, H-BAR, W, BAR);
+  ctx.fillStyle = '#141008';
+  const nameSize = fitFontSize(state.name.toUpperCase(), 1200, 92, 60, size => size + 'px "Anton", Impact, sans-serif');
+  ctx.font = nameSize + 'px "Anton", Impact, sans-serif';
+  ctx.fillText(state.name.toUpperCase(), M, H - BAR/2 + 33);
+
+  ctx.textAlign = 'right';
+  const hashSize = fitFontSize(state.hash, 620, 78, 52, size => size + 'px "Anton", Impact, sans-serif');
+  ctx.font = hashSize + 'px "Anton", Impact, sans-serif';
+  ctx.fillText(state.hash, W - M, H - BAR/2 + 29);
+  ctx.textAlign = 'left';
+
+  /* --- bloc titre (ancré au-dessus du bandeau) --- */
+  let fs = 205;
+  let lines = [];
+  while(fs >= 110){
+    ctx.font = fs + 'px "Anton", Impact, sans-serif';
+    lines = wrapTextLines(state.head, W - (M * 2) - 140).filter(line => line.trim() !== '');
+    if(lines.length <= 3) break;
+    fs -= 4;
+  }
+  if(!lines.length){
+    lines = [state.head.trim() || ''];
+  }
+  const lh = fs * 1.02;
+  const bottom = H - BAR - 110;                 // base de la dernière ligne
+  const top = bottom - (lines.length-1)*lh;
+  const titleVisualTop = top - (fs * 0.78);
+
+  ctx.font = fs + 'px "Anton", Impact, sans-serif';
+  lines.forEach((raw,i)=>{
+    const y = top + i*lh;
+    // dernier mot de la dernière ligne en orange, ou mots préfixés par |
+    let words = raw.trim().split(/\s+/);
+    const isLast = i === lines.length-1;
+    let x = M;
+    words.forEach((w,wi)=>{
+      let colored = false;
+      if(w.startsWith('|')){ colored = true; w = w.slice(1); }
+      else if(isLast && wi === words.length-1 && !state.head.includes('|')) colored = true;
+      ctx.fillStyle = colored ? ORANGE : '#ffffff';
+      ctx.fillText(w, x, y);
+      x += ctx.measureText(w+' ').width;
+    });
+  });
+
+  /* --- sous-titre --- */
+  const subSize = fitFontSize(state.sub, W - (M * 2) - 120, 46, 28, size => '500 ' + size + 'px "Barlow", sans-serif');
+  const subY = titleVisualTop - 54;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '500 ' + subSize + 'px "Barlow", sans-serif';
+  ctx.fillText(state.sub, M, subY);
+
+  /* --- étiquette blanche --- */
+  const tg = state.tag.toUpperCase();
+  const tagTracking = 8;
+  const tagSize = fitTrackedFontSize(tg, 760, 44, 28, tagTracking, size => '700 ' + size + 'px "Barlow Condensed", sans-serif');
+  ctx.font = '700 ' + tagSize + 'px "Barlow Condensed", sans-serif';
+  const tw = measureTrackedText(tg, tagTracking);
+  const tbH = 88;
+  const tbY = subY - subSize - tbH - 28;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(M, tbY, tw + 74, tbH);
+  ctx.fillStyle = '#141008';
+  drawTrackedText(tg, M + 36, tbY + 58, tagTracking);
+}
+
+/* ---------- liaison formulaire ---------- */
+const fields = ['l1','l2','tag','sub','head','name','hash'];
+fields.forEach(id=>{
+  const el = document.getElementById(id);
+  state[id] = id === 'l2' ? FIXED_MOTTO : el.value;
+  el.addEventListener('input', ()=>{ state[id]=el.value; render(); });
+});
+state.l2 = FIXED_MOTTO;
+document.getElementById('zoom').addEventListener('input', e=>{ state.zoom=+e.target.value; clampPhotoOffsets(); render(); });
+
+function loadFile(input, cb){
+  input.addEventListener('change', ()=>{
+    const f = input.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{ const im = new Image(); im.onload = ()=>cb(im, r.result, f.name); im.src = r.result; };
+    r.readAsDataURL(f);
+  });
+}
+loadFile(document.getElementById('photo'), (im,_d,n)=>{
+  state.img = im; state.ox = 0; state.oy = 0;
+  clampPhotoOffsets();
+  document.getElementById('photoName').textContent = n;
+  render();
+});
+
+/* glisser pour recadrer */
+let drag=null;
+cv.addEventListener('pointerdown', e=>{
+  if(!state.img) return;
+  const r = cv.getBoundingClientRect();
+  drag = {x:e.clientX, y:e.clientY, ox:state.ox, oy:state.oy, k: W/r.width};
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e=>{
+  if(!drag) return;
+  state.ox = drag.ox + (e.clientX-drag.x)*drag.k;
+  state.oy = drag.oy + (e.clientY-drag.y)*drag.k;
+  clampPhotoOffsets();
+  render();
+});
+addEventListener('pointerup', ()=> drag=null);
+
+/* export */
+document.getElementById('download').addEventListener('click', ()=>{
+  render();
+  const a = document.createElement('a');
+  a.download = 'visuel-' + (state.name||'acc').toLowerCase().replace(/[^a-z0-9]+/g,'-') + '.png';
+  a.href = cv.toDataURL('image/png');
+  a.click();
+});
+document.getElementById('reset').addEventListener('click', ()=> location.reload());
+
+/* premier rendu après chargement des polices */
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(render);
+render();
+</script>
+</body>
+</html>
