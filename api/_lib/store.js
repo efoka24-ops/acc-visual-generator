@@ -9,6 +9,18 @@ const LOCAL_DIR = process.env.VERCEL
 const LOCAL_FILE = path.join(LOCAL_DIR, 'visual-events.json');
 const KV_KEY = 'acc:visual-events';
 const MAX_EVENTS = 1500;
+const POSTGRES_TABLE = 'visual_events';
+
+let pgPool = null;
+let postgresInitPromise = null;
+
+function getDatabaseUrl(){
+  return process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || '';
+}
+
+function hasPostgresEnv(){
+  return Boolean(getDatabaseUrl());
+}
 
 function hasKvEnv(){
   return Boolean(
@@ -40,11 +52,78 @@ function writeLocalEvents(events){
 }
 
 function getStoreMode(){
+  if(hasPostgresEnv()) return 'postgres';
   return hasKvEnv() ? 'kv' : 'file';
 }
 
+function getPgPool(){
+  if(!hasPostgresEnv()) return null;
+  if(pgPool) return pgPool;
+  try{
+    const { Pool } = require('pg');
+    pgPool = new Pool({ connectionString: getDatabaseUrl() });
+    return pgPool;
+  }catch(_error){
+    return null;
+  }
+}
+
+async function ensurePostgresTable(){
+  const pool = getPgPool();
+  if(!pool) return false;
+  if(!postgresInitPromise){
+    postgresInitPromise = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ${POSTGRES_TABLE} (
+          id TEXT PRIMARY KEY,
+          created_at TIMESTAMPTZ NOT NULL,
+          event_data JSONB NOT NULL
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${POSTGRES_TABLE}_created_at_idx ON ${POSTGRES_TABLE} (created_at DESC)`);
+      return true;
+    })().catch(error => {
+      postgresInitPromise = null;
+      throw error;
+    });
+  }
+  return postgresInitPromise;
+}
+
+async function readPostgresEvents(){
+  const pool = getPgPool();
+  if(!pool) return null;
+  await ensurePostgresTable();
+  const result = await pool.query(
+    `SELECT event_data FROM ${POSTGRES_TABLE} ORDER BY created_at DESC LIMIT $1`,
+    [MAX_EVENTS]
+  );
+  return result.rows.map(row => row.event_data).filter(item => item && typeof item === 'object');
+}
+
+async function appendPostgresEvent(event){
+  const pool = getPgPool();
+  if(!pool) return false;
+  await ensurePostgresTable();
+  await pool.query(
+    `INSERT INTO ${POSTGRES_TABLE} (id, created_at, event_data) VALUES ($1, $2, $3::jsonb)
+     ON CONFLICT (id) DO UPDATE SET created_at = EXCLUDED.created_at, event_data = EXCLUDED.event_data`,
+    [event.id, event.createdAt, JSON.stringify(event)]
+  );
+  await pool.query(
+    `DELETE FROM ${POSTGRES_TABLE}
+     WHERE id IN (
+       SELECT id FROM ${POSTGRES_TABLE}
+       ORDER BY created_at DESC
+       OFFSET $1
+     )`,
+    [MAX_EVENTS]
+  );
+  return true;
+}
+
 async function getKvClient(){
-  if(getStoreMode() !== 'kv') return null;
+  if(!hasKvEnv()) return null;
   try{
     const packageRef = require('@vercel/kv');
     return packageRef.kv;
@@ -55,6 +134,34 @@ async function getKvClient(){
 
 async function getStoreInfo(){
   const mode = getStoreMode();
+  if(mode === 'postgres'){
+    const pool = getPgPool();
+    if(!pool){
+      return {
+        mode: 'file',
+        persistent: false,
+        label: 'Postgres indisponible',
+        hint: 'Les variables Postgres sont présentes, mais le client pg n’est pas disponible. Vérifie la dépendance et le déploiement.'
+      };
+    }
+    try{
+      await ensurePostgresTable();
+      return {
+        mode: 'postgres',
+        persistent: true,
+        label: 'Postgres connecté',
+        hint: 'Les statistiques sont conservées de façon permanente dans la base Postgres.'
+      };
+    }catch(_error){
+      return {
+        mode: 'file',
+        persistent: false,
+        label: 'Postgres indisponible',
+        hint: 'La connexion Postgres a échoué. Vérifie DATABASE_URL et le statut de la base.'
+      };
+    }
+  }
+
   if(mode !== 'kv'){
     return {
       mode: 'file',
@@ -83,6 +190,13 @@ async function getStoreInfo(){
 }
 
 async function readEvents(){
+  if(hasPostgresEnv()){
+    try{
+      const stored = await readPostgresEvents();
+      if(Array.isArray(stored)) return stored;
+    }catch(_error){}
+  }
+
   const kv = await getKvClient();
   if(kv){
     const stored = await kv.get(KV_KEY);
@@ -93,6 +207,19 @@ async function readEvents(){
 
 async function writeEvents(events){
   const next = events.slice(0, MAX_EVENTS);
+
+  if(hasPostgresEnv()){
+    const pool = getPgPool();
+    if(pool){
+      await ensurePostgresTable();
+      await pool.query(`TRUNCATE TABLE ${POSTGRES_TABLE}`);
+      for(const event of next){
+        await appendPostgresEvent(event);
+      }
+      return;
+    }
+  }
+
   const kv = await getKvClient();
   if(kv){
     await kv.set(KV_KEY, next);
@@ -102,6 +229,13 @@ async function writeEvents(events){
 }
 
 async function appendEvent(event){
+  if(hasPostgresEnv()){
+    try{
+      const done = await appendPostgresEvent(event);
+      if(done) return event;
+    }catch(_error){}
+  }
+
   const existing = await readEvents();
   const next = [event, ...existing].slice(0, MAX_EVENTS);
   await writeEvents(next);
