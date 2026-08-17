@@ -20,8 +20,11 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--ink);color:var(--txt);font-family:'Barlow',system-ui,sans-serif}
   header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px}
+  .headsp{flex:1}
   header h1{font-family:'Anton',Impact,sans-serif;font-size:20px;letter-spacing:.5px;margin:0;text-transform:uppercase}
   header span{color:var(--orange);font-family:'Barlow Condensed';letter-spacing:2px;font-size:13px;text-transform:uppercase}
+  .navlink{display:inline-flex;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:999px;color:var(--txt);text-decoration:none;font-size:12px;letter-spacing:1px;text-transform:uppercase}
+  .navlink:hover{border-color:var(--orange);color:#fff}
   .wrap{display:grid;grid-template-columns:400px 1fr;gap:0;min-height:calc(100vh - 61px)}
   .form{padding:22px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 61px)}
   .stage{padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px;background:#0e0b07}
@@ -36,6 +39,10 @@
   .file input{display:none}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45}
+  .status{margin-top:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);font-size:12px;line-height:1.4}
+  .status[data-tone="ok"]{border-color:#315a39;color:#d8f3dc;background:rgba(49,90,57,.18)}
+  .status[data-tone="warn"]{border-color:#6a4a1d;color:#ffe2b3;background:rgba(106,74,29,.18)}
+  .status[data-tone="muted"]{border-color:var(--line);color:var(--muted);background:rgba(255,255,255,.02)}
   button.dl{width:100%;margin-top:22px;background:var(--orange);color:#1a1207;border:0;padding:14px;border-radius:8px;
     font-family:'Anton';font-size:16px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
   button.dl:hover{background:#ffb63f}
@@ -54,7 +61,9 @@
 
 <header>
   <h1>Générateur de visuel</h1>
+  <div class="headsp"></div>
   <span>All Cameroonian Congress</span>
+  <a class="navlink" href="backoffice.html">Back Office</a>
 </header>
 
 <div class="wrap">
@@ -101,9 +110,11 @@ DE CAMP.</textarea>
     </div>
 
     <div class="hint">Le logo, le filtre et la mise en page restent inchangés pour tous les visuels.</div>
+    <div class="hint">Le suivi des statistiques et des localisations s'active automatiquement quand l'application est utilisée en ligne.</div>
 
     <button class="dl" id="download">Télécharger le visuel</button>
     <button class="ghost" id="reset">Réinitialiser</button>
+    <div class="status" id="trackStatus" data-tone="muted" hidden></div>
   </div>
 
   <div class="stage">
@@ -118,6 +129,7 @@ const ORANGE = '#F0A02A';
 const FIXED_MOTTO = 'UNITÉ — PROGRÈS — ÉQUITÉ';
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
+const trackStatus = document.getElementById('trackStatus');
 
 const state = {
   img: null,
@@ -229,6 +241,76 @@ function drawPhoto(){
   ctx.globalCompositeOperation = 'source-over';
 }
 
+function setTrackStatus(message, tone){
+  if(!trackStatus) return;
+  trackStatus.hidden = !message;
+  trackStatus.dataset.tone = tone || 'muted';
+  trackStatus.textContent = message || '';
+}
+
+function getTextValue(id){
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+async function getGeoSnapshot(){
+  if(location.protocol === 'file:' || !('geolocation' in navigator)) return null;
+  return new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      position => resolve({
+        lat: Number(position.coords.latitude.toFixed(6)),
+        lng: Number(position.coords.longitude.toFixed(6)),
+        accuracy: Math.round(position.coords.accuracy || 0)
+      }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 3200, maximumAge: 300000 }
+    );
+  });
+}
+
+async function trackGeneration(){
+  if(location.protocol === 'file:'){
+    setTrackStatus('Suivi désactivé en ouverture locale. Il sera actif après déploiement.', 'muted');
+    return;
+  }
+
+  try{
+    const geo = await getGeoSnapshot();
+    const payload = {
+      candidateName: getTextValue('name'),
+      hashtag: getTextValue('hash'),
+      coordination: getTextValue('l1'),
+      motto: FIXED_MOTTO,
+      sloganTag: getTextValue('tag'),
+      sloganSub: getTextValue('sub'),
+      headline: getTextValue('head'),
+      language: navigator.language || '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+      screen: { width: window.screen.width, height: window.screen.height },
+      geo
+    };
+
+    const response = await fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true
+    });
+
+    if(!response.ok){
+      setTrackStatus('Le visuel a été téléchargé, mais le suivi n\'a pas répondu.', 'warn');
+      return;
+    }
+
+    setTrackStatus(
+      geo ? 'Visuel enregistré avec localisation dans le back office.' : 'Visuel enregistré dans les statistiques du back office.',
+      'ok'
+    );
+  }catch(_error){
+    setTrackStatus('Le visuel a été téléchargé, mais le suivi est indisponible pour le moment.', 'warn');
+  }
+}
+
 function fitFontSize(text, maxWidth, startSize, minSize, fontBuilder){
   let size = startSize;
   while(size > minSize){
@@ -330,11 +412,14 @@ function render(){
   ctx.font = '700 ' + coord1Size + 'px "Barlow Condensed", sans-serif';
   drawTrackedText(state.l1.toUpperCase(), M, 180, coordTracking1);
 
-  ctx.fillStyle = ORANGE;
-  const coordTracking2 = 7;
-  const coord2Size = fitTrackedFontSize(state.l2.toUpperCase(), W - M - RIGHT_SAFE, 32, 20, coordTracking2, size => '600 ' + size + 'px "Barlow Condensed", sans-serif');
-  ctx.font = '600 ' + coord2Size + 'px "Barlow Condensed", sans-serif';
-  drawTrackedText(state.l2.toUpperCase(), M, 232, coordTracking2);
+  ctx.fillStyle = '#ffffff';
+  const coord2Size = fitFontSize(state.l2.toUpperCase(), W - M - RIGHT_SAFE, 36, 24, size => '700 ' + size + 'px "Barlow Condensed", sans-serif');
+  ctx.font = '700 ' + coord2Size + 'px "Barlow Condensed", sans-serif';
+  ctx.shadowColor = 'rgba(20,16,10,0.55)';
+  ctx.shadowBlur = 10;
+  ctx.fillText(state.l2.toUpperCase(), M, 232);
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 
   /* --- logo haut-droite --- */
   const lr = 118, lcx = W - M - lr, lcy = 232;
@@ -455,6 +540,7 @@ addEventListener('pointerup', ()=> drag=null);
 /* export */
 document.getElementById('download').addEventListener('click', ()=>{
   render();
+  void trackGeneration();
   const a = document.createElement('a');
   a.download = 'visuel-' + (state.name||'acc').toLowerCase().replace(/[^a-z0-9]+/g,'-') + '.png';
   a.href = cv.toDataURL('image/png');

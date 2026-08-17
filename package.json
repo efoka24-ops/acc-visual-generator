@@ -1,0 +1,9 @@
+{
+  "name": "acc-visual-generator",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Generateur de visuels de campagne ACC avec back office.",
+  "dependencies": {
+    "@vercel/kv": "^1.0.1"
+  }
+}

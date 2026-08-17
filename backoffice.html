@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACC Back Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --orange:#F0A02A;
+    --orange-soft:#ffcc74;
+    --ink:#120d08;
+    --panel:#1a140f;
+    --panel-2:#241c15;
+    --line:#3a2e22;
+    --txt:#f4ede3;
+    --muted:#b7a891;
+    --ok:#dff2e1;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(circle at top,#2b1c0c 0,#130d08 35%,#0c0906 100%);color:var(--txt);font-family:'Barlow',system-ui,sans-serif}
+  a{color:inherit}
+  header{padding:26px 28px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:flex-end;gap:14px}
+  h1{margin:0;font-family:'Anton',Impact,sans-serif;letter-spacing:1px;font-size:40px;text-transform:uppercase}
+  .sub{color:var(--orange-soft);font-family:'Barlow Condensed';letter-spacing:2px;text-transform:uppercase;font-size:14px}
+  .head-actions{display:flex;gap:10px;flex-wrap:wrap}
+  .btn,.token-input{border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03);color:var(--txt);padding:10px 14px;font-size:12px;text-transform:uppercase;letter-spacing:1px}
+  .btn{text-decoration:none;cursor:pointer}
+  .btn:hover{border-color:var(--orange);color:#fff}
+  .token-input{min-width:220px;text-transform:none;letter-spacing:0}
+  main{padding:28px;display:grid;gap:22px}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+  .card,.panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .card{padding:18px}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.6px;color:var(--muted);margin-bottom:10px}
+  .value{font-family:'Anton',Impact,sans-serif;font-size:44px;line-height:1;color:#fff}
+  .meta{margin-top:8px;font-size:13px;color:var(--muted)}
+  .layout{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+  .panel{padding:20px}
+  .panel h2{margin:0 0 16px;font-family:'Barlow Condensed';font-size:24px;letter-spacing:1.2px;text-transform:uppercase}
+  .chart{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:10px;align-items:end;height:220px}
+  .barwrap{display:grid;gap:8px}
+  .bar{min-height:8px;border-radius:12px 12px 4px 4px;background:linear-gradient(180deg,var(--orange-soft),var(--orange));box-shadow:0 8px 20px rgba(240,160,42,.25)}
+  .barlabel,.barvalue{font-size:11px;text-align:center;color:var(--muted)}
+  .barvalue{color:#fff}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;text-align:left;vertical-align:top}
+  th{font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted)}
+  .muted{color:var(--muted)}
+  .chip{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;background:rgba(240,160,42,.12);color:var(--orange-soft);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  .status{padding:12px 14px;border-radius:12px;border:1px solid var(--line);font-size:14px;color:var(--muted);background:rgba(255,255,255,.03)}
+  .status[data-tone="warn"]{border-color:#6a4a1d;color:#ffe2b3;background:rgba(106,74,29,.18)}
+  .status[data-tone="ok"]{border-color:#315a39;color:var(--ok);background:rgba(49,90,57,.18)}
+  .stack{display:grid;gap:16px}
+  .recent-item{padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .recent-item:last-child{border-bottom:0;padding-bottom:0}
+  .recent-name{font-weight:700;font-size:15px}
+  .recent-meta{font-size:12px;color:var(--muted);margin-top:4px}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:1100px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout,.twocol{grid-template-columns:1fr}}
+  @media(max-width:720px){header{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}.chart{gap:6px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="sub">All Cameroonian Congress</div>
+    <h1>Back Office Visuels</h1>
+  </div>
+  <div class="head-actions">
+    <input id="token" class="token-input" type="password" placeholder="Token admin optionnel">
+    <button id="refresh" class="btn" type="button">Actualiser</button>
+    <a class="btn" href="index.html">Retour au générateur</a>
+  </div>
+</header>
+<main>
+  <div id="status" class="status" data-tone="ok">Chargement des statistiques...</div>
+
+  <section class="grid" id="summary">
+    <article class="card"><div class="eyebrow">Visuels générés</div><div class="value" id="totalCount">0</div><div class="meta">Total enregistré</div></article>
+    <article class="card"><div class="eyebrow">Aujourd'hui</div><div class="value" id="todayCount">0</div><div class="meta">Générations du jour</div></article>
+    <article class="card"><div class="eyebrow">7 derniers jours</div><div class="value" id="weekCount">0</div><div class="meta">Volume récent</div></article>
+    <article class="card"><div class="eyebrow">Localisations</div><div class="value" id="locationCount">0</div><div class="meta">Villes ou points connus</div></article>
+  </section>
+
+  <section class="layout">
+    <article class="panel">
+      <h2>Activité sur 14 jours</h2>
+      <div class="chart" id="trendChart"></div>
+    </article>
+    <article class="panel stack">
+      <div>
+        <h2>Mode de stockage</h2>
+        <div class="chip" id="storeMode">Inconnu</div>
+      </div>
+      <div>
+        <h2>Top coordinations</h2>
+        <table>
+          <thead><tr><th>Coordination</th><th>Volume</th></tr></thead>
+          <tbody id="coordRows"></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <section class="twocol">
+    <article class="panel">
+      <h2>Derniers visuels</h2>
+      <div id="recentList"></div>
+    </article>
+    <article class="panel">
+      <h2>Localisation</h2>
+      <table>
+        <thead><tr><th>Lieu</th><th>Volume</th><th>Coordonnées</th></tr></thead>
+        <tbody id="locationRows"></tbody>
+      </table>
+    </article>
+  </section>
+</main>
+
+<script>
+const statusEl = document.getElementById('status');
+const tokenInput = document.getElementById('token');
+
+function setStatus(message, tone){
+  statusEl.textContent = message;
+  statusEl.dataset.tone = tone || 'ok';
+}
+
+function escapeHtml(value){
+  return String(value || '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+
+function formatDateTime(value){
+  if(!value) return 'Date inconnue';
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function renderSummary(summary){
+  document.getElementById('totalCount').textContent = summary.total || 0;
+  document.getElementById('todayCount').textContent = summary.today || 0;
+  document.getElementById('weekCount').textContent = summary.last7Days || 0;
+  document.getElementById('locationCount').textContent = summary.locationCount || 0;
+}
+
+function renderTrend(trend){
+  const root = document.getElementById('trendChart');
+  root.innerHTML = '';
+  const max = Math.max(...trend.map(item => item.count), 1);
+  trend.forEach(item => {
+    const wrap = document.createElement('div');
+    wrap.className = 'barwrap';
+    const value = document.createElement('div');
+    value.className = 'barvalue';
+    value.textContent = item.count;
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = Math.max((item.count / max) * 150, 8) + 'px';
+    const label = document.createElement('div');
+    label.className = 'barlabel';
+    label.textContent = item.label;
+    wrap.append(value, bar, label);
+    root.appendChild(wrap);
+  });
+}
+
+function renderTableRows(targetId, rows, emptyText, renderer){
+  const tbody = document.getElementById(targetId);
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="3" class="muted">' + emptyText + '</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(renderer).join('');
+}
+
+function renderRecents(items){
+  const root = document.getElementById('recentList');
+  if(!items.length){
+    root.innerHTML = '<div class="muted">Aucun visuel suivi pour le moment.</div>';
+    return;
+  }
+  root.innerHTML = items.map(item => `
+    <div class="recent-item">
+      <div class="recent-name">${escapeHtml(item.candidateName || 'Sans nom')} <span class="muted">${escapeHtml(item.hashtag || '')}</span></div>
+      <div class="recent-meta">${escapeHtml(item.coordination || 'Coordination inconnue')} · ${escapeHtml(item.locationLabel || 'Localisation inconnue')}</div>
+      <div class="recent-meta">${escapeHtml(formatDateTime(item.createdAt))}</div>
+    </div>
+  `).join('');
+}
+
+async function loadStats(){
+  setStatus('Chargement des statistiques...', 'ok');
+  const token = tokenInput.value.trim();
+  const url = token ? '/api/stats?token=' + encodeURIComponent(token) : '/api/stats';
+  const response = await fetch(url, { headers: token ? { 'x-admin-token': token } : {} });
+  if(response.status === 401){
+    setStatus('Accès refusé. Renseigne le token admin si BACKOFFICE_TOKEN est configuré.', 'warn');
+    return;
+  }
+  if(!response.ok){
+    throw new Error('Stats indisponibles');
+  }
+  const data = await response.json();
+  renderSummary(data.summary || {});
+  renderTrend(data.trend || []);
+  renderTableRows('coordRows', data.topCoordinations || [], 'Aucune coordination suivie.', item => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td></tr>`);
+  renderTableRows('locationRows', data.locations || [], 'Aucune localisation suivie.', item => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td><td>${escapeHtml(item.coordinates || 'Non communiquées')}</td></tr>`);
+  renderRecents(data.recent || []);
+  document.getElementById('storeMode').textContent = data.storeMode || 'file';
+  setStatus('Back office à jour. ' + (data.summary.total || 0) + ' visuel(x) enregistré(s).', 'ok');
+}
+
+document.getElementById('refresh').addEventListener('click', () => {
+  loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
+});
+
+loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
+</script>
+</body>
+</html>
