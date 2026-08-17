@@ -447,6 +447,16 @@ async function trackGeneration(){
 
     if(!response.ok){
       setTrackStatus('Le visuel a été téléchargé, mais le suivi n\'a pas répondu.', 'warn');
+      await triggerExcelBackup('Serveur injoignable');
+      return;
+    }
+
+    let result = null;
+    try{ result = await response.json(); }catch(_error){}
+    const store = result && result.store ? result.store : null;
+    if(store && store.persistent === false){
+      await triggerExcelBackup(store.label || 'Fallback temporaire');
+      setTrackStatus('Visuel enregistré en mode temporaire. Un fichier Excel de sauvegarde a été téléchargé.', 'warn');
       return;
     }
 
@@ -456,7 +466,24 @@ async function trackGeneration(){
     );
   }catch(_error){
     setTrackStatus('Le visuel a été téléchargé, mais le suivi est indisponible pour le moment.', 'warn');
+    await triggerExcelBackup('Suivi indisponible');
   }
+}
+
+async function triggerExcelBackup(reason){
+  if(location.protocol === 'file:') return;
+  try{
+    const response = await fetch('/api/export');
+    if(!response.ok) return;
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.download = 'backup-visuels-' + stamp + '.xlsx';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setTrackStatus('Sauvegarde Excel téléchargée automatiquement (' + reason + ').', 'warn');
+  }catch(_error){}
 }
 
 function fitFontSize(text, maxWidth, startSize, minSize, fontBuilder){

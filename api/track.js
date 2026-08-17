@@ -72,8 +72,12 @@ module.exports = async (req, res) => {
       networkLocation: { city, region, country, label: locationLabel || '' }
     };
 
-    await appendEvent(event);
-    return sendJson(res, 200, { ok: true, id: event.id });
+    const result = await appendEvent(event);
+    return sendJson(res, 200, {
+      ok: true,
+      id: event.id,
+      store: result && result.store ? result.store : null
+    });
   }catch(_error){
     return sendJson(res, 400, { error: 'Invalid payload' });
   }

@@ -122,6 +122,16 @@ async function appendPostgresEvent(event){
   return true;
 }
 
+async function appendKvEvent(event){
+  const kv = await getKvClient();
+  if(!kv) return false;
+  const existing = await kv.get(KV_KEY);
+  const list = Array.isArray(existing) ? existing : [];
+  const next = [event, ...list].slice(0, MAX_EVENTS);
+  await kv.set(KV_KEY, next);
+  return true;
+}
+
 async function getKvClient(){
   if(!hasKvEnv()) return null;
   try{
@@ -232,14 +242,44 @@ async function appendEvent(event){
   if(hasPostgresEnv()){
     try{
       const done = await appendPostgresEvent(event);
-      if(done) return event;
+      if(done){
+        return {
+          event,
+          store: {
+            mode: 'postgres',
+            persistent: true,
+            label: 'Postgres connecté'
+          }
+        };
+      }
     }catch(_error){}
   }
+
+  try{
+    const kvDone = await appendKvEvent(event);
+    if(kvDone){
+      return {
+        event,
+        store: {
+          mode: 'kv',
+          persistent: true,
+          label: 'Vercel KV connecté'
+        }
+      };
+    }
+  }catch(_error){}
 
   const existing = await readEvents();
   const next = [event, ...existing].slice(0, MAX_EVENTS);
   await writeEvents(next);
-  return event;
+  return {
+    event,
+    store: {
+      mode: 'file',
+      persistent: false,
+      label: 'Fallback temporaire'
+    }
+  };
 }
 
 function createEventId(){
