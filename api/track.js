@@ -54,6 +54,8 @@ module.exports = async (req, res) => {
       id: createEventId(),
       createdAt: new Date().toISOString(),
       candidateName: sanitizeText(payload.candidateName, 120),
+      contactName: sanitizeText(payload.contactName, 120),
+      phone: sanitizeText(payload.phone, 40),
       hashtag: sanitizeText(payload.hashtag, 80),
       coordination: sanitizeText(payload.coordination, 120),
       motto: sanitizeText(payload.motto, 120),

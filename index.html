@@ -29,9 +29,9 @@
   .form{padding:22px;border-right:1px solid var(--line);overflow-y:auto;max-height:calc(100vh - 61px)}
   .stage{padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px;background:#0e0b07}
   label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);margin:16px 0 6px;font-weight:600}
-  input[type=text],textarea,select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);
+  input[type=text],input[type=tel],textarea,select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);
     padding:10px 12px;border-radius:6px;font-family:'Barlow';font-size:14px}
-  input[type=text]:focus,textarea:focus{outline:none;border-color:var(--orange)}
+  input[type=text]:focus,input[type=tel]:focus,textarea:focus{outline:none;border-color:var(--orange)}
   textarea{resize:vertical;min-height:88px;line-height:1.35}
   input[type=range]{width:100%;accent-color:var(--orange)}
   .file{border:1px dashed var(--line);border-radius:8px;padding:14px;text-align:center;cursor:pointer;background:var(--panel);font-size:13px;color:var(--muted)}
@@ -109,8 +109,14 @@ DE CAMP.</textarea>
       </div>
     </div>
 
+    <div class="sep-t">Identification obligatoire</div>
+    <label>Nom complet du militant</label>
+    <input type="text" id="contactName" placeholder="Ex. Ousmane Hamadou">
+    <label>Numéro de téléphone</label>
+    <input type="tel" id="phone" placeholder="Ex. 6 99 99 99 99" inputmode="tel">
+
     <div class="hint">Le logo, le filtre et la mise en page restent inchangés pour tous les visuels.</div>
-    <div class="hint">Le suivi des statistiques et des localisations s'active automatiquement quand l'application est utilisée en ligne.</div>
+    <div class="hint">Avant téléchargement, le militant doit renseigner son nom, son téléphone et sa coordination. Ces données alimentent le fichier Excel du back office.</div>
 
     <button class="dl" id="download">Télécharger le visuel</button>
     <button class="ghost" id="reset">Réinitialiser</button>
@@ -134,7 +140,7 @@ const trackStatus = document.getElementById('trackStatus');
 const state = {
   img: null,
   zoom: 1, ox: 0, oy: 0,          // offsets en pixels canvas
-  l1: '', l2: '', tag: '', sub: '', head: '', name: '', hash: ''
+  l1: '', l2: '', tag: '', sub: '', head: '', name: '', hash: '', contactName: '', phone: ''
 };
 
 const fixedLogo = new Image();
@@ -253,6 +259,18 @@ function getTextValue(id){
   return el ? el.value.trim() : '';
 }
 
+function normalizePhone(value){
+  return String(value || '').replace(/[^\d+]/g, '').trim();
+}
+
+function validateRequiredFields(){
+  const missing = [];
+  if(!getTextValue('contactName')) missing.push('nom du militant');
+  if(!normalizePhone(getTextValue('phone'))) missing.push('numéro de téléphone');
+  if(!getTextValue('l1')) missing.push('coordination');
+  return missing;
+}
+
 async function getGeoSnapshot(){
   if(location.protocol === 'file:' || !('geolocation' in navigator)) return null;
   return new Promise(resolve => {
@@ -278,6 +296,8 @@ async function trackGeneration(){
     const geo = await getGeoSnapshot();
     const payload = {
       candidateName: getTextValue('name'),
+      contactName: getTextValue('contactName'),
+      phone: normalizePhone(getTextValue('phone')),
       hashtag: getTextValue('hash'),
       coordination: getTextValue('l1'),
       motto: FIXED_MOTTO,
@@ -496,7 +516,7 @@ function render(){
 }
 
 /* ---------- liaison formulaire ---------- */
-const fields = ['l1','l2','tag','sub','head','name','hash'];
+const fields = ['l1','l2','tag','sub','head','name','hash','contactName','phone'];
 fields.forEach(id=>{
   const el = document.getElementById(id);
   state[id] = id === 'l2' ? FIXED_MOTTO : el.value;
@@ -539,6 +559,11 @@ addEventListener('pointerup', ()=> drag=null);
 
 /* export */
 document.getElementById('download').addEventListener('click', ()=>{
+  const missing = validateRequiredFields();
+  if(missing.length){
+    setTrackStatus('Renseigne ' + missing.join(', ') + ' avant de télécharger le visuel.', 'warn');
+    return;
+  }
   render();
   void trackGeneration();
   const a = document.createElement('a');

@@ -95,6 +95,8 @@ module.exports = async (req, res) => {
     locations: buildLocations(events),
     recent: events.slice(0, 30).map(event => ({
       candidateName: event.candidateName,
+      contactName: event.contactName,
+      phone: event.phone,
       hashtag: event.hashtag,
       coordination: event.coordination,
       createdAt: event.createdAt,

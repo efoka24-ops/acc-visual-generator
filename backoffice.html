@@ -71,6 +71,7 @@
   </div>
   <div class="head-actions">
     <input id="token" class="token-input" type="password" placeholder="Token admin optionnel">
+    <button id="exportExcel" class="btn" type="button">Exporter Excel</button>
     <button id="refresh" class="btn" type="button">Actualiser</button>
     <a class="btn" href="index.html">Retour au générateur</a>
   </div>
@@ -185,9 +186,38 @@ function renderRecents(items){
     <div class="recent-item">
       <div class="recent-name">${escapeHtml(item.candidateName || 'Sans nom')} <span class="muted">${escapeHtml(item.hashtag || '')}</span></div>
       <div class="recent-meta">${escapeHtml(item.coordination || 'Coordination inconnue')} · ${escapeHtml(item.locationLabel || 'Localisation inconnue')}</div>
+      <div class="recent-meta">Militant: ${escapeHtml(item.contactName || 'Non renseigné')} · Tél: ${escapeHtml(item.phone || 'Non renseigné')}</div>
       <div class="recent-meta">${escapeHtml(formatDateTime(item.createdAt))}</div>
     </div>
   `).join('');
+}
+
+function exportExcel(){
+  const token = tokenInput.value.trim();
+  const url = token ? '/api/export?token=' + encodeURIComponent(token) : '/api/export';
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', url, true);
+  xhr.responseType = 'blob';
+  if(token) xhr.setRequestHeader('x-admin-token', token);
+  xhr.onload = () => {
+    if(xhr.status === 401){
+      setStatus('Accès refusé pour l\'export. Renseigne le token admin.', 'warn');
+      return;
+    }
+    if(xhr.status < 200 || xhr.status >= 300){
+      setStatus('Export Excel indisponible pour le moment.', 'warn');
+      return;
+    }
+    const blob = xhr.response;
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'acc-visuels-export.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setStatus('Export Excel-compatible téléchargé.', 'ok');
+  };
+  xhr.onerror = () => setStatus('Export Excel indisponible pour le moment.', 'warn');
+  xhr.send();
 }
 
 async function loadStats(){
@@ -215,6 +245,7 @@ async function loadStats(){
 document.getElementById('refresh').addEventListener('click', () => {
   loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
 });
+document.getElementById('exportExcel').addEventListener('click', exportExcel);
 
 loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
 </script>
