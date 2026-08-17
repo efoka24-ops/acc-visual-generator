@@ -68,11 +68,11 @@
 </head>
 <body>
 
-<div class="gate" id="gate">
+<div class="gate" id="gate" hidden>
   <div class="gate-card">
     <div class="gate-sub">Identification obligatoire</div>
-    <h2 class="gate-title">Accès au générateur</h2>
-    <p class="gate-copy">Avant d'ouvrir le générateur, le militant doit renseigner son nom complet, son numéro de téléphone et sa coordination. Ces données alimentent le back office et l'export Excel.</p>
+    <h2 class="gate-title">Avant téléchargement</h2>
+    <p class="gate-copy">Avant de télécharger le visuel, le militant doit renseigner son nom complet, son numéro de téléphone et sa coordination. Ces données alimentent le back office et le fichier Excel.</p>
     <label>Nom complet du militant</label>
     <input type="text" id="gateContactName" placeholder="Ex. Ousmane Hamadou">
     <label>Numéro de téléphone</label>
@@ -80,10 +80,10 @@
     <label>Coordination</label>
     <input type="text" id="gateCoordination" placeholder="Ex. ACC · FIGUIL">
     <div class="gate-actions">
-      <button class="dl" id="gateSubmit" type="button" style="margin-top:0">Ouvrir le générateur</button>
+      <button class="dl" id="gateSubmit" type="button" style="margin-top:0">Valider et télécharger</button>
     </div>
     <div class="status" id="gateStatus" data-tone="muted" hidden></div>
-    <div class="gate-note">Ces informations restent modifiables dans le formulaire avant le téléchargement final.</div>
+    <div class="gate-note">Les informations sont enregistrées pour le suivi et réutilisées lors du prochain téléchargement.</div>
   </div>
 </div>
 
@@ -91,7 +91,6 @@
   <h1>Générateur de visuel</h1>
   <div class="headsp"></div>
   <span>All Cameroonian Congress</span>
-  <button class="navlink navbtn" id="editIdentity" type="button">Identité</button>
   <a class="navlink" href="backoffice.html">Back Office</a>
 </header>
 
@@ -138,14 +137,11 @@ DE CAMP.</textarea>
       </div>
     </div>
 
-    <div class="sep-t">Identification obligatoire</div>
-    <label>Nom complet du militant</label>
-    <input type="text" id="contactName" placeholder="Ex. Ousmane Hamadou">
-    <label>Numéro de téléphone</label>
-    <input type="tel" id="phone" placeholder="Ex. 6 99 99 99 99" inputmode="tel">
+    <input type="hidden" id="contactName">
+    <input type="hidden" id="phone">
 
     <div class="hint">Le logo, le filtre et la mise en page restent inchangés pour tous les visuels.</div>
-    <div class="hint">Avant téléchargement, le militant doit renseigner son nom, son téléphone et sa coordination. Ces données alimentent le fichier Excel du back office.</div>
+    <div class="hint">Au clic sur téléchargement, un popup demande le nom du militant, son téléphone et sa coordination. Ces données alimentent le fichier Excel du back office.</div>
 
     <button class="dl" id="download">Télécharger le visuel</button>
     <button class="ghost" id="reset">Réinitialiser</button>
@@ -173,6 +169,7 @@ const gateFields = {
   coordination: document.getElementById('gateCoordination')
 };
 const STORAGE_KEY = 'acc_identity_v1';
+let pendingDownload = false;
 
 const state = {
   img: null,
@@ -362,6 +359,15 @@ function closeGate(){
   document.body.style.overflow = '';
 }
 
+function performDownload(){
+  render();
+  void trackGeneration();
+  const a = document.createElement('a');
+  a.download = 'visuel-' + (state.name||'acc').toLowerCase().replace(/[^a-z0-9]+/g,'-') + '.png';
+  a.href = cv.toDataURL('image/png');
+  a.click();
+}
+
 function submitGate(){
   const identity = {
     contactName: gateFields.contactName.value.trim(),
@@ -378,8 +384,12 @@ function submitGate(){
   }
   writeIdentity(identity);
   syncIdentityFields(identity);
-  setTrackStatus('Identité enregistrée. Le générateur est prêt.', 'ok');
+  setTrackStatus('Identité enregistrée pour le téléchargement du visuel.', 'ok');
   closeGate();
+  if(pendingDownload){
+    pendingDownload = false;
+    performDownload();
+  }
 }
 
 function validateRequiredFields(){
@@ -678,22 +688,11 @@ addEventListener('pointerup', ()=> drag=null);
 
 /* export */
 document.getElementById('download').addEventListener('click', ()=>{
-  const missing = validateRequiredFields();
-  if(missing.length){
-    setTrackStatus('Renseigne ' + missing.join(', ') + ' avant de télécharger le visuel.', 'warn');
-    openGate();
-    return;
-  }
-  render();
-  void trackGeneration();
-  const a = document.createElement('a');
-  a.download = 'visuel-' + (state.name||'acc').toLowerCase().replace(/[^a-z0-9]+/g,'-') + '.png';
-  a.href = cv.toDataURL('image/png');
-  a.click();
+  pendingDownload = true;
+  openGate();
 });
 document.getElementById('reset').addEventListener('click', ()=> location.reload());
 document.getElementById('gateSubmit').addEventListener('click', submitGate);
-document.getElementById('editIdentity').addEventListener('click', () => openGate());
 
 Object.values(gateFields).forEach(field => {
   field.addEventListener('keydown', event => {
@@ -707,9 +706,6 @@ Object.values(gateFields).forEach(field => {
   const savedIdentity = readIdentity();
   if(savedIdentity && savedIdentity.contactName && savedIdentity.phone && savedIdentity.coordination){
     syncIdentityFields(savedIdentity);
-    closeGate();
-  } else {
-    openGate(savedIdentity || undefined);
   }
 });
 render();
