@@ -10,6 +10,14 @@ const LOCAL_FILE = path.join(LOCAL_DIR, 'visual-events.json');
 const KV_KEY = 'acc:visual-events';
 const MAX_EVENTS = 1500;
 
+function hasKvEnv(){
+  return Boolean(
+    (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) ||
+    (process.env.KV_URL && process.env.KV_REST_API_TOKEN) ||
+    (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  );
+}
+
 function ensureLocalStore(){
   if(!fs.existsSync(LOCAL_DIR)) fs.mkdirSync(LOCAL_DIR, { recursive: true });
   if(!fs.existsSync(LOCAL_FILE)) fs.writeFileSync(LOCAL_FILE, '[]', 'utf8');
@@ -32,7 +40,7 @@ function writeLocalEvents(events){
 }
 
 function getStoreMode(){
-  return process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN ? 'kv' : 'file';
+  return hasKvEnv() ? 'kv' : 'file';
 }
 
 async function getKvClient(){
@@ -43,6 +51,35 @@ async function getKvClient(){
   }catch(_error){
     return null;
   }
+}
+
+async function getStoreInfo(){
+  const mode = getStoreMode();
+  if(mode !== 'kv'){
+    return {
+      mode: 'file',
+      persistent: false,
+      label: process.env.VERCEL ? 'Fallback temporaire' : 'Fichier local',
+      hint: process.env.VERCEL ? 'Ajoute Vercel KV pour conserver les stats durablement.' : 'Les stats sont enregistrées localement sur ce poste.'
+    };
+  }
+
+  const kv = await getKvClient();
+  if(!kv){
+    return {
+      mode: 'file',
+      persistent: false,
+      label: 'KV indisponible',
+      hint: 'Les variables KV sont présentes, mais le client KV ne répond pas. Vérifie l’intégration Vercel KV.'
+    };
+  }
+
+  return {
+    mode: 'kv',
+    persistent: true,
+    label: 'Vercel KV connecté',
+    hint: 'Les statistiques sont conservées de façon permanente dans Vercel KV.'
+  };
 }
 
 async function readEvents(){
@@ -80,5 +117,6 @@ module.exports = {
   appendEvent,
   createEventId,
   getStoreMode,
+  getStoreInfo,
   readEvents
 };

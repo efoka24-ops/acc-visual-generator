@@ -1,4 +1,4 @@
-const { getStoreMode, readEvents } = require('./_lib/store');
+const { getStoreInfo, readEvents } = require('./_lib/store');
 
 function sendJson(res, statusCode, body){
   res.statusCode = statusCode;
@@ -30,6 +30,29 @@ function countBy(items, selector){
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
+}
+
+function normalizeSearch(value){
+  return String(value || '').trim().toLowerCase();
+}
+
+function filterEvents(events, search){
+  const needle = normalizeSearch(search);
+  if(!needle) return events;
+  return events.filter(event => {
+    const haystack = [
+      event.candidateName,
+      event.contactName,
+      event.phone,
+      event.coordination,
+      event.hashtag,
+      event.sloganTag,
+      event.sloganSub,
+      event.headline,
+      event.networkLocation && event.networkLocation.label
+    ].join(' ').toLowerCase();
+    return haystack.includes(needle);
+  });
 }
 
 function buildTrend(events){
@@ -77,23 +100,27 @@ module.exports = async (req, res) => {
   }
 
   const events = await readEvents();
+  const filteredEvents = filterEvents(events, req.query && req.query.search);
+  const store = await getStoreInfo();
   const today = startOfToday().getTime();
   const last7 = today - (6 * 24 * 60 * 60 * 1000);
 
   const summary = {
-    total: events.length,
-    today: events.filter(event => new Date(event.createdAt).getTime() >= today).length,
-    last7Days: events.filter(event => new Date(event.createdAt).getTime() >= last7).length,
-    locationCount: buildLocations(events).filter(item => item.label !== 'Non renseigné').length
+    total: filteredEvents.length,
+    today: filteredEvents.filter(event => new Date(event.createdAt).getTime() >= today).length,
+    last7Days: filteredEvents.filter(event => new Date(event.createdAt).getTime() >= last7).length,
+    locationCount: buildLocations(filteredEvents).filter(item => item.label !== 'Non renseigné').length
   };
 
   const payload = {
-    storeMode: getStoreMode(),
+    storeMode: store.mode,
+    storeInfo: store,
+    search: req.query && req.query.search ? String(req.query.search) : '',
     summary,
-    trend: buildTrend(events),
-    topCoordinations: countBy(events, event => event.coordination),
-    locations: buildLocations(events),
-    recent: events.slice(0, 30).map(event => ({
+    trend: buildTrend(filteredEvents),
+    topCoordinations: countBy(filteredEvents, event => event.coordination),
+    locations: buildLocations(filteredEvents),
+    recent: filteredEvents.slice(0, 100).map(event => ({
       candidateName: event.candidateName,
       contactName: event.contactName,
       phone: event.phone,

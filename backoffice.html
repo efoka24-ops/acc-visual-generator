@@ -30,6 +30,7 @@
   .btn{text-decoration:none;cursor:pointer}
   .btn:hover{border-color:var(--orange);color:#fff}
   .token-input{min-width:220px;text-transform:none;letter-spacing:0}
+  .search-input{min-width:260px;text-transform:none;letter-spacing:0}
   main{padding:28px;display:grid;gap:22px}
   .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
   .card,.panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
@@ -71,6 +72,7 @@
   </div>
   <div class="head-actions">
     <input id="token" class="token-input" type="password" placeholder="Token admin optionnel">
+    <input id="search" class="token-input search-input" type="search" placeholder="Recherche nom ou téléphone">
     <button id="exportExcel" class="btn" type="button">Exporter XLSX</button>
     <button id="refresh" class="btn" type="button">Actualiser</button>
     <a class="btn" href="index.html">Retour au générateur</a>
@@ -95,6 +97,7 @@
       <div>
         <h2>Mode de stockage</h2>
         <div class="chip" id="storeMode">Inconnu</div>
+        <div class="meta" id="storeHint">Chargement du mode de stockage...</div>
       </div>
       <div>
         <h2>Top coordinations</h2>
@@ -124,6 +127,8 @@
 <script>
 const statusEl = document.getElementById('status');
 const tokenInput = document.getElementById('token');
+const searchInput = document.getElementById('search');
+let searchTimer = null;
 
 function setStatus(message, tone){
   statusEl.textContent = message;
@@ -223,7 +228,11 @@ function exportExcel(){
 async function loadStats(){
   setStatus('Chargement des statistiques...', 'ok');
   const token = tokenInput.value.trim();
-  const url = token ? '/api/stats?token=' + encodeURIComponent(token) : '/api/stats';
+  const search = searchInput.value.trim();
+  const params = new URLSearchParams();
+  if(token) params.set('token', token);
+  if(search) params.set('search', search);
+  const url = '/api/stats' + (params.toString() ? '?' + params.toString() : '');
   const response = await fetch(url, { headers: token ? { 'x-admin-token': token } : {} });
   if(response.status === 401){
     setStatus('Accès refusé. Renseigne le token admin si BACKOFFICE_TOKEN est configuré.', 'warn');
@@ -238,14 +247,29 @@ async function loadStats(){
   renderTableRows('coordRows', data.topCoordinations || [], 'Aucune coordination suivie.', item => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td></tr>`);
   renderTableRows('locationRows', data.locations || [], 'Aucune localisation suivie.', item => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td><td>${escapeHtml(item.coordinates || 'Non communiquées')}</td></tr>`);
   renderRecents(data.recent || []);
-  document.getElementById('storeMode').textContent = data.storeMode || 'file';
-  setStatus('Back office à jour. ' + (data.summary.total || 0) + ' visuel(x) enregistré(s).', 'ok');
+  document.getElementById('storeMode').textContent = (data.storeInfo && data.storeInfo.label) || data.storeMode || 'file';
+  document.getElementById('storeHint').textContent = (data.storeInfo && data.storeInfo.hint) || '';
+  const searchLabel = search ? ' pour la recherche en cours' : '';
+  setStatus('Back office à jour. ' + (data.summary.total || 0) + ' visuel(x) enregistré(s)' + searchLabel + '.', 'ok');
 }
 
 document.getElementById('refresh').addEventListener('click', () => {
   loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
 });
 document.getElementById('exportExcel').addEventListener('click', exportExcel);
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
+  }, 250);
+});
+searchInput.addEventListener('keydown', event => {
+  if(event.key === 'Enter'){
+    event.preventDefault();
+    clearTimeout(searchTimer);
+    loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
+  }
+});
 
 loadStats().catch(() => setStatus('Impossible de récupérer les statistiques.', 'warn'));
 </script>
