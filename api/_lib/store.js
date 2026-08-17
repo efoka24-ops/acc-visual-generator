@@ -1,8 +1,11 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 
-const LOCAL_DIR = path.join(process.cwd(), '.data');
+const LOCAL_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'acc-visual-generator-data')
+  : path.join(process.cwd(), '.data');
 const LOCAL_FILE = path.join(LOCAL_DIR, 'visual-events.json');
 const KV_KEY = 'acc:visual-events';
 const MAX_EVENTS = 1500;
